@@ -10,6 +10,7 @@ import (
 	"sort"
 	"sync"
 	"time"
+	"fmt"
 )
 
 const defaultTimeout = 500
@@ -100,33 +101,15 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		go func(url string) {
 			defer wg.Done()
 
-			var (
-				numbers NumbersResponse
-				err     error
-				res     *http.Response
-				req     *http.Request
-			)
-
-			// New request will be closed if it takes more than timeout value
-			req, err = http.NewRequest("GET", url, nil)
+			// If error, only log it
+			numbers, err := receiveNumbers(url, ctx)
 			if err != nil {
-				return
-			}
-			req = req.WithContext(ctx)
-
-			res, err = client.Do(req)
-			if err != nil {
-				return
-			}
-			defer res.Body.Close()
-
-			dec := json.NewDecoder(res.Body)
-			if err = dec.Decode(&numbers); err != nil {
+				log.Printf("Background err: %s", err)
 				return
 			}
 
 			// Send numbers to the merge
-			tube <- numbers.Numbers
+			tube <- numbers
 		}(u)
 	}
 
@@ -147,8 +130,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 		// Sort new data before merging
 		sort.Ints(new)
-
-		log.Printf("Got numbers: %v", new)
 
 		// First iteration
 		if len(sset) == 0 {
@@ -230,4 +211,34 @@ func uniqFromSorted(arr []int) []int {
 	}
 
 	return res
+}
+
+// receiveNumbers from remote server
+func receiveNumbers(url string, ctx context.Context) ([]int, error) {
+	var (
+		numbers NumbersResponse
+		err     error
+		res     *http.Response
+		req     *http.Request
+	)
+
+	// New request will be closed if it takes more than timeout value
+	req, err = http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("new number request: %s", err)
+	}
+	req = req.WithContext(ctx)
+
+	res, err = client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("during number request err: %s", err)
+	}
+	defer res.Body.Close()
+
+	dec := json.NewDecoder(res.Body)
+	if err = dec.Decode(&numbers); err != nil {
+		return nil, fmt.Errorf("decode numbers response: %s", err)
+	}
+
+	return numbers.Numbers, nil
 }

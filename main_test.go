@@ -57,9 +57,12 @@ func TestMerge(t *testing.T) {
 
 func BenchmarkMerge(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest("GET", fmt.Sprintf("http://example.com/numbers?u=localhost:8090/primes&u=localhost:8090/rand"), nil)
+		req := httptest.NewRequest("GET", fmt.Sprintf("http://example.com/numbers?u=http://localhost:8090/primes&u=http://localhost:8090/rand"), nil)
 		w := httptest.NewRecorder()
 		handler(w, req)
+		if w.Code != http.StatusOK {
+			b.Errorf("unexpected status code: %d", w.Code)
+		}
 	}
 }
 
