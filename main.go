@@ -235,6 +235,10 @@ func receiveNumbers(url string, ctx context.Context) ([]int, error) {
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("service returns unexpected ststus: %d", res.StatusCode)
+	}
+
 	dec := json.NewDecoder(res.Body)
 	if err = dec.Decode(&numbers); err != nil {
 		return nil, fmt.Errorf("decode numbers response: %s", err)
